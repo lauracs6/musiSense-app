@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from "../api/axios";
 import ElectroBorder from "./Electroborder";
+import { isTrackPlayable } from "../utils/trackUtils";
 import {
   Home as HomeIcon,
   Search,

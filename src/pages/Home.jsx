@@ -9,10 +9,17 @@ const Home = ({ onPlay }) => {
   const [genres, setGenres] = useState([]);
   const [artists, setArtists] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [activeTrackMenuId, setActiveTrackMenuId] = useState(null);
 
   const isAuthenticated = !!localStorage.getItem("token");
+
+  // Función auxiliar para obtener URL completa de la carátula
+  const getCoverUrl = (cover) => {
+    if (!cover) return null;
+    if (cover.startsWith("http")) return cover;
+    const baseUrl = api.defaults.baseURL.replace(/\/api$/, '');
+    return `${baseUrl}/storage/${cover}`;
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -39,10 +46,7 @@ const Home = ({ onPlay }) => {
 
           albumsData.forEach((album) => {
             if (!artistMap[album.artist] && album.cover) {
-              const coverUrl = album.cover.startsWith("http")
-                ? album.cover
-                : `http://musisense.test/storage/${album.cover}`;
-
+              const coverUrl = getCoverUrl(album.cover);
               artistMap[album.artist] = coverUrl;
             }
           });
@@ -95,15 +99,24 @@ const Home = ({ onPlay }) => {
       <section>
         <h2 className="text-xl text-white mb-6">Explore Genres</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {genres.map((genre) => (
-            <Link
-              key={genre.id}
-              to={`/genre/${genre.id}`}
-              className="h-12 bg-gradient-to-r from-gray-900 to-gray-700 rounded-full hover:brightness-150 flex items-center justify-center cursor-pointer transition-all group px-4 text-center"
-            >
-              <span className="text-white text-sm">{genre.name}</span>
-            </Link>
-          ))}
+          {genres.map((genre) => {
+            // Verificar si el género está inactivo (status = 'n')
+            const isInactive = genre.status === 'n';
+            return (
+              <Link
+                key={genre.id}
+                to={isInactive ? "#" : `/genre/${genre.id}`}
+                onClick={(e) => isInactive && e.preventDefault()}
+                className={`h-12 bg-gradient-to-r from-gray-900 to-gray-700 rounded-full flex items-center justify-center cursor-pointer transition-all group px-4 text-center ${
+                  isInactive
+                    ? "opacity-50 grayscale pointer-events-none"
+                    : "hover:brightness-150"
+                }`}
+              >
+                <span className="text-white text-sm">{genre.name}</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -134,7 +147,6 @@ const Home = ({ onPlay }) => {
                     className="w-full h-full object-cover transition-transform duration-500"
                   />
                 </div>
-
                 <span className="text-sm text-white">{artist.name}</span>
               </Link>
             ))}
@@ -158,11 +170,7 @@ const Home = ({ onPlay }) => {
                 <div className="w-12 h-12 rounded flex items-center justify-center overflow-hidden shadow-md transition-all relative shrink-0">
                   {track.album?.cover ? (
                     <img
-                      src={
-                        track.album.cover.startsWith("http")
-                          ? track.album.cover
-                          : `http://musisense.test/storage/${track.album.cover}`
-                      }
+                      src={getCoverUrl(track.album.cover)}
                       alt={track.title}
                       className="w-full h-full object-cover"
                     />
@@ -174,9 +182,7 @@ const Home = ({ onPlay }) => {
                   </div>
                 </div>
                 <div className="flex flex-col truncate">
-                  <span className="text-white text-sm">
-                    {track.title}
-                  </span>
+                  <span className="text-white text-sm">{track.title}</span>
                   <span className="text-xs text-gray-400 group-hover:text-slate-300 truncate">
                     {track.artist}
                   </span>
