@@ -55,7 +55,15 @@ const MainLayout = ({
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // 🔥 DETENER REPRODUCTOR SI SE CIERRA SESIÓN
+  // Función auxiliar para obtener la URL completa de la carátula
+  const getCoverUrl = (cover) => {
+    if (!cover) return null;
+    if (cover.startsWith("http")) return cover;
+    // La base del storage es la raíz del backend (sin /api)
+    const baseUrl = api.defaults.baseURL.replace(/\/api$/, '');
+    return `${baseUrl}/storage/${cover}`;
+  };
+
   useEffect(() => {
     if (!token) {
       if (audioRef.current) {
@@ -76,9 +84,7 @@ const MainLayout = ({
 
   useEffect(() => {
     fetchPlaylists();
-
     window.addEventListener("playlist-created", fetchPlaylists);
-
     return () => {
       window.removeEventListener("playlist-created", fetchPlaylists);
     };
@@ -102,11 +108,9 @@ const MainLayout = ({
 
   useEffect(() => {
     if (!isPlaying) return;
-
     const interval = setInterval(() => {
       setColorIndex((prevIndex) => (prevIndex + 1) % rainbowColors.length);
     }, 4000);
-
     return () => clearInterval(interval);
   }, [isPlaying, rainbowColors.length]);
 
@@ -147,7 +151,7 @@ const MainLayout = ({
     } finally {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      setIsPlaying(false); // Forzar apagado inmediato de estados antes de navegar
+      setIsPlaying(false);
       navigate("/login");
     }
   };
@@ -156,10 +160,15 @@ const MainLayout = ({
   const volumePercent = volume * 100;
   const currentBorderColor = rainbowColors[colorIndex];
 
+  // Construir la URL del stream usando la baseURL de axios
+  const streamUrl = currentTrack && token
+    ? `${api.defaults.baseURL}/tracks/${currentTrack.id}/stream`
+    : null;
+
   return (
     <div className="flex h-screen w-screen flex-col bg-black text-gray-300 font-sans select-none overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
-        {/* SIDEBAR */}
+        {/* SIDEBAR (igual que antes, sin cambios) */}
         <aside className="w-64 bg-gray-900 p-4 flex flex-col gap-4 border-r border-slate-900 overflow-y-auto overflow-x-hidden no-scrollbar">
           <div className="pt-2">
             <Link
@@ -187,16 +196,13 @@ const MainLayout = ({
             </Link>
           </nav>
 
-          {/* SI USUARIO ESTÁ AUTENTICADO */}
           {token && (
             <div className="flex flex-col gap-4 animate-fade-in">
-              {/* PLAYLISTS */}
               <div>
                 <div className="flex items-center justify-between px-3 mb-4">
                   <p className="text-sm/lg font-bold text-white tracking-widest">
                     My Playlists
                   </p>
-
                   <Link
                     to="/create-playlist"
                     title="Create Playlist"
@@ -210,7 +216,6 @@ const MainLayout = ({
                     Create
                   </Link>
                 </div>
-
                 <div className="space-y-2 max-h-[250px] overflow-y-auto no-scrollbar px-3 border-l border-indigo-950 ml-1">
                   {playlists.length === 0 ? (
                     <p className="text-xs text-slate-500 italic pl-1 py-1 font-medium select-none">
@@ -240,7 +245,6 @@ const MainLayout = ({
             </div>
           )}
 
-          {/* LOGIN / LOGOUT */}
           <div className="mt-auto pt-3 border-t border-indigo-950">
             {token ? (
               <div className="space-y-3">
@@ -282,17 +286,16 @@ const MainLayout = ({
           </div>
         </aside>
 
-        {/* MAIN DISPLAY */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-slate-900/50 to-black p-8">
           {children}
         </main>
       </div>
 
-      {/* AUDIO (logueado) */}
+      {/* AUDIO (solo si hay token y currentTrack) */}
       {token && currentTrack && (
         <audio
           ref={audioRef}
-          src={`http://musisense.test/api/tracks/${currentTrack.id}/stream`}
+          src={streamUrl}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={onNext}
@@ -301,7 +304,6 @@ const MainLayout = ({
 
       {/* REPRODUCTOR */}
       {token ? (
-        /* USUARIO AUTENTICADO -> REPRODUCTOR MUSICAL */
         <ElectroBorder
           borderColor={currentBorderColor}
           borderWidth={3}
@@ -317,11 +319,7 @@ const MainLayout = ({
               <div className="animate-spin [animation-duration:20s] w-14 h-14 bg-slate-800 rounded-full border border-indigo-500/20 flex items-center justify-center overflow-hidden shrink-0">
                 {currentTrack?.album?.cover ? (
                   <img
-                    src={
-                      currentTrack.album.cover.startsWith("http")
-                        ? currentTrack.album.cover
-                        : `http://musisense.test/storage/${currentTrack.album.cover}`
-                    }
+                    src={getCoverUrl(currentTrack.album.cover)}
                     alt=""
                     className="w-full h-full object-cover"
                   />
@@ -428,7 +426,6 @@ const MainLayout = ({
           </footer>
         </ElectroBorder>
       ) : (
-        /* SIN SESIÓN -> BARRA DE BRANDING CORPORATIVO */
         <footer className="h-24 bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 px-8 flex items-center justify-between border-t border-indigo-950/40 relative z-50">
           <div className="flex items-center gap-4">
             <img

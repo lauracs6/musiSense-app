@@ -10,13 +10,18 @@ const AlbumDetail = ({ onPlay }) => {
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-
-  // Control centralizado para los menús desplegables de las canciones
   const [activeTrackMenuId, setActiveTrackMenuId] = useState(null);
+
+  // Función auxiliar para obtener URL completa de la carátula
+  const getCoverUrl = (cover) => {
+    if (!cover) return null;
+    if (cover.startsWith("http")) return cover;
+    const baseUrl = api.defaults.baseURL.replace(/\/api$/, '');
+    return `${baseUrl}/storage/${cover}`;
+  };
 
   useEffect(() => {
     setLoading(true);
-
     api
       .get(`/albums/${id}`)
       .then((res) => {
@@ -25,23 +30,22 @@ const AlbumDetail = ({ onPlay }) => {
 
         const albumTracks = albumData.tracks || [];
 
-        // Inyectamos tanto el contexto del álbum (carátula) como el artista para el reproductor
+        // Inyectamos el contexto del álbum y artista para el reproductor
         const tracksWithAlbumContext = albumTracks.map((track) => ({
           ...track,
-          artist: track.artist || albumData.artist, // Soluciona el texto genérico en la barra inferior
+          // Si el track no tiene artista propio, usa el del álbum
+          artist: track.artist || albumData.artist,
           album: {
             id: albumData.id,
-            title: albumData.name || albumData.title,
-            cover: albumData.cover, // Soluciona la carátula vacía en el reproductor
+            title: albumData.title,  // ← Cambiado de name a title
+            cover: albumData.cover,
           },
         }));
 
-        // Ordenamos las canciones por número de pista
         const sortedTracks = [...tracksWithAlbumContext].sort(
-          (a, b) => (a.track_number || 0) - (b.track_number || 0),
+          (a, b) => (a.track_number || 0) - (b.track_number || 0)
         );
         setTracks(sortedTracks);
-
         setLoading(false);
       })
       .catch((err) => {
@@ -62,11 +66,7 @@ const AlbumDetail = ({ onPlay }) => {
       <div className="text-center text-slate-400 py-12">Album not found.</div>
     );
 
-  const coverUrl = album.cover
-    ? album.cover.startsWith("http")
-      ? album.cover
-      : `http://musisense.test/storage/${album.cover}`
-    : null;
+  const coverUrl = getCoverUrl(album.cover);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -84,17 +84,13 @@ const AlbumDetail = ({ onPlay }) => {
         <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
           <img
             src={coverUrl}
-            alt={album.name || album.title}
+            alt={album.title}
             className="w-70 h-65 object-cover rounded-lg shadow-lg"
           />
           <div className="flex flex-col text-center md:text-left space-y-2">
-            <p className="text-4xl text-white font-bold">
-              {album.name || album.title}
-            </p>
+            <p className="text-4xl text-white font-bold">{album.title}</p>
             <p className="text-white text-xl">{album.artist}</p>
-            <p className="text-white text-lg">
-              {album.year || album.release_year || "N/A"}
-            </p>
+            <p className="text-white text-lg">{album.year || "N/A"}</p>
             <p className="text-white text-sm">{tracks.length} tracks</p>
           </div>
         </div>
@@ -108,7 +104,6 @@ const AlbumDetail = ({ onPlay }) => {
           </div>
         ) : (
           <div className="w-full flex flex-col">
-            {/* Encabezados de columnas */}
             <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-2 border-b border-gray-800 text-[11px] tracking-widest text-gray-300">
               <div className="w-10 text-center">#</div>
               <div>Song</div>
@@ -118,7 +113,6 @@ const AlbumDetail = ({ onPlay }) => {
               </div>
             </div>
 
-            {/* Filas de canciones */}
             <div className="mt-2 space-y-0.5">
               {tracks.map((track, index) => (
                 <div
@@ -148,20 +142,15 @@ const AlbumDetail = ({ onPlay }) => {
                     </div>
                   </div>
 
-                  {/* Nombre del Álbum */}
                   <div className="hidden md:flex items-center text-sm text-gray-400 truncate pr-4">
-                    <span className="truncate">
-                      {album.name || album.title}
-                    </span>
+                    <span className="truncate">{album.title}</span>
                   </div>
 
-                  {/* Duración y Menú de Acciones */}
                   <div className="w-24 flex items-center justify-end gap-4">
                     <span className="text-sm text-gray-400 ">
                       {Math.floor(track.duration / 60)}:
                       {String(track.duration % 60).padStart(2, "0")}
                     </span>
-
                     <TrackActions
                       track={track}
                       isOpen={activeTrackMenuId === track.id}

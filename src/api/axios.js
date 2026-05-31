@@ -2,6 +2,8 @@ import axios from 'axios';
 
 axios.defaults.withCredentials = true; // Permite el envío de cookies de sesión
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://musisense.test/api';
+
 const api = axios.create({    
     baseURL: 'http://musisense.test/api',
     headers: {
