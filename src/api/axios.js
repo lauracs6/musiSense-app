@@ -1,50 +1,57 @@
-import axios from 'axios';
+import axios from "axios";
 
-axios.defaults.withCredentials = true; // Permite el envío de cookies de sesión
+axios.defaults.withCredentials = true;
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://musisense.test/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://musisense.test/api";
 
-const api = axios.create({    
-    baseURL: 'http://musisense.test/api',
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
 });
 
-/**
- * Request Interceptor
- * Automatically attaches the Bearer Token to every request 
- * if the user is logged in.
- */
 api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
+  },
+  (error) => Promise.reject(error),
 );
 
-/**
- * Response Interceptor
- * Handles common errors globally (like 401 Unauthorized)
- */
 api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        // If the server returns 401 (Unauthorized), the token might be expired
-        if (error.response && error.response.status === 401) {
-            console.warn("Unauthorized request. Redirecting to login...");
-            localStorage.removeItem('token');
-            // Optional: window.location.href = '/login';
-        }
-        return Promise.reject(error);
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      const { status, data } = error.response;
+
+      // 401: No autenticado
+      if (status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
+
+      // 403: Cuenta desactivada o acceso prohibido
+      if (
+        status === 403 &&
+        data?.message &&
+        data.message.includes("deactivated")
+      ) {
+        // Guardar mensaje para mostrarlo en login
+        localStorage.setItem("deactivatedMessage", data.message);
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
+    return Promise.reject(error);
+  },
 );
 
 export default api;

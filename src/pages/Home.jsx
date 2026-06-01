@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { Music, Loader2, Play } from "lucide-react";
 import TrackActions from "../components/TrackActions";
+import { isTrackPlayable } from "../utils/trackUtils";
 
 const Home = ({ onPlay }) => {
   const [songs, setSongs] = useState([]);
@@ -29,42 +30,33 @@ const Home = ({ onPlay }) => {
     setLoading(true);
     Promise.all([api.get("/tracks"), api.get("/genres"), api.get("/albums")])
       .then(([resTracks, resGenres, resAlbums]) => {
+        // --- CANCIONES: solo las que son reproducibles ---
         const tracksData = resTracks.data.data || resTracks.data || [];
-        setSongs(
-          Array.isArray(tracksData)
-            ? tracksData.sort(() => 0.5 - Math.random()).slice(0, 6)
-            : [],
-        );
+        const playableTracks = tracksData.filter(track => isTrackPlayable(track));
+        const randomSongs = playableTracks
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 6);
+        setSongs(randomSongs);
 
+        // --- GÉNEROS ---
         const genresData = resGenres.data.data || resGenres.data || [];
         setGenres(Array.isArray(genresData) ? genresData : []);
 
+        // --- ARTISTAS (a partir de álbumes, como antes) ---
         const albumsData = resAlbums.data.data || resAlbums.data || [];
         if (Array.isArray(albumsData)) {
           const artistMap = new Map();
-
           albumsData.forEach((album) => {
             const artistName = album.artist;
             if (!artistName) return;
-
             if (!artistMap.has(artistName) && album.cover) {
               const coverUrl = getCoverUrl(album.cover);
-              
-              // Determinar si el artista está activo:
-              // - El artista no debe estar desactivado (artist_active !== false)
-              // - El género del álbum (si existe) debe estar activo (status === 'y')
               const isArtistInactive = album.artist_active === false;
               const isGenreInactive = album.genre && album.genre.status === 'n';
               const isActive = !isArtistInactive && !isGenreInactive;
-              
-              artistMap.set(artistName, { 
-                name: artistName, 
-                cover: coverUrl, 
-                active: isActive 
-              });
+              artistMap.set(artistName, { name: artistName, cover: coverUrl, active: isActive });
             }
           });
-
           const uniqueArtists = Array.from(artistMap.values()).slice(0, 6);
           setArtists(uniqueArtists);
         }
@@ -166,56 +158,58 @@ const Home = ({ onPlay }) => {
         </section>
       )}
 
-      {/* TRACKS */}
-      <section>
-        <h2 className="text-xl text-white mb-6">Tracks you might like</h2>
-        <div className="flex flex-col gap-4">
-          {songs.map((track, index) => (
-            <div
-              key={track.id}
-              className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 rounded-xl hover:brightness-110 transition-all group px-4 shadow-md border border-slate-800/40"
-            >
+      {/* TRACKS - solo se muestran canciones reproducibles */}
+      {songs.length > 0 && (
+        <section>
+          <h2 className="text-xl text-white mb-6">Tracks you might like</h2>
+          <div className="flex flex-col gap-4">
+            {songs.map((track, index) => (
               <div
-                className="flex items-center gap-5 flex-1 cursor-pointer"
-                onClick={() => onPlay(track, songs)}
+                key={track.id}
+                className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 rounded-xl hover:brightness-110 transition-all group px-4 shadow-md border border-slate-800/40"
               >
-                <div className="w-12 h-12 rounded flex items-center justify-center overflow-hidden shadow-md transition-all relative shrink-0">
-                  {track.album?.cover ? (
-                    <img
-                      src={getCoverUrl(track.album.cover)}
-                      alt={track.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Music size={18} className="text-slate-600" />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Play size={16} fill="white" className="text-white" />
+                <div
+                  className="flex items-center gap-5 flex-1 cursor-pointer"
+                  onClick={() => onPlay(track, songs)}
+                >
+                  <div className="w-12 h-12 rounded flex items-center justify-center overflow-hidden shadow-md transition-all relative shrink-0">
+                    {track.album?.cover ? (
+                      <img
+                        src={getCoverUrl(track.album.cover)}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Music size={18} className="text-slate-600" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Play size={16} fill="white" className="text-white" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col truncate">
+                    <span className="text-white text-sm">{track.title}</span>
+                    <span className="text-xs text-gray-400 group-hover:text-slate-300 truncate">
+                      {track.artist}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col truncate">
-                  <span className="text-white text-sm">{track.title}</span>
-                  <span className="text-xs text-gray-400 group-hover:text-slate-300 truncate">
-                    {track.artist}
+                <div className="flex items-center gap-6">
+                  <span className="hidden md:block text-xs text-gray-300">
+                    {Math.floor(track.duration / 60)}:
+                    {String(track.duration % 60).padStart(2, "0")}
                   </span>
+                  <TrackActions
+                    track={track}
+                    isOpen={activeTrackMenuId === track.id}
+                    setIsOpen={(open) => setActiveTrackMenuId(open ? track.id : null)}
+                    isLastItem={index >= songs.length - 2}
+                  />
                 </div>
               </div>
-              <div className="flex items-center gap-6">
-                <span className="hidden md:block text-xs text-gray-300">
-                  {Math.floor(track.duration / 60)}:
-                  {String(track.duration % 60).padStart(2, "0")}
-                </span>
-                <TrackActions
-                  track={track}
-                  isOpen={activeTrackMenuId === track.id}
-                  setIsOpen={(open) => setActiveTrackMenuId(open ? track.id : null)}
-                  isLastItem={index >= songs.length - 2}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };
