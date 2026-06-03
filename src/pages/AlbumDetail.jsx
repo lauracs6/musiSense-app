@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { Loader2, ArrowLeft, Play, Clock } from "lucide-react";
@@ -12,6 +12,7 @@ const AlbumDetail = ({ onPlay }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [activeTrackMenuId, setActiveTrackMenuId] = useState(null);
+  const pollingRef = useRef(null);
 
   const getCoverUrl = (cover) => {
     if (!cover) return null;
@@ -20,41 +21,65 @@ const AlbumDetail = ({ onPlay }) => {
     return `${baseUrl}/storage/${cover}`;
   };
 
-  useEffect(() => {
+  const fetchAlbum = useCallback(async () => {
     setLoading(true);
-    api.get(`/albums/${id}`)
-      .then((res) => {
-        const albumData = res.data.data || res.data;
-        setAlbum(albumData);
-        const albumTracks = albumData.tracks || [];
-        const tracksWithContext = albumTracks.map((track) => ({
-          ...track,
-          artist: track.artist || albumData.artist,
-          album: {
-            id: albumData.id,
-            title: albumData.title,
-            cover: albumData.cover,
-            status: albumData.status,
-            artist_active: albumData.artist_active,
-          },
-        }));
-        const sortedTracks = [...tracksWithContext].sort(
-          (a, b) => (a.track_number || 0) - (b.track_number || 0)
-        );
-        setTracks(sortedTracks);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error loading album detail:", err);
-        setLoading(false);
-      });
+    try {
+      const res = await api.get(`/albums/${id}`);
+      const albumData = res.data.data || res.data;
+      setAlbum(albumData);
+      const albumTracks = albumData.tracks || [];
+      const tracksWithContext = albumTracks.map((track) => ({
+        ...track,
+        artist: track.artist || albumData.artist,
+        album: {
+          id: albumData.id,
+          title: albumData.title,
+          cover: albumData.cover,
+          status: albumData.status,
+          artist_active: albumData.artist_active,
+        },
+      }));
+      const sortedTracks = [...tracksWithContext].sort(
+        (a, b) => (a.track_number || 0) - (b.track_number || 0)
+      );
+      setTracks(sortedTracks);
+    } catch (err) {
+      console.error("Error loading album detail:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchAlbum();
+  }, [fetchAlbum]);
+
+  // Polling cada 10 segundos (solo visible)
+  useEffect(() => {
+    const startPolling = () => {
+      if (pollingRef.current) return;
+      pollingRef.current = setInterval(() => {
+        if (document.visibilityState === 'visible') fetchAlbum();
+      }, 10000);
+    };
+    startPolling();
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [fetchAlbum]);
+
+  // Escuchar evento global
+  useEffect(() => {
+    const handleRefresh = () => fetchAlbum();
+    window.addEventListener("track-invalidated", handleRefresh);
+    return () => window.removeEventListener("track-invalidated", handleRefresh);
+  }, [fetchAlbum]);
 
   if (loading) return <div className="flex h-64 items-center justify-center text-indigo-500"><Loader2 className="animate-spin" size={48} /></div>;
   if (!album) return <div className="text-center text-slate-400 py-12">Album not found.</div>;
 
   const coverUrl = getCoverUrl(album.cover);
-  const albumActive = album.status === 'y'; // true si activo
+  const albumActive = album.status === 'y';
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -64,7 +89,6 @@ const AlbumDetail = ({ onPlay }) => {
         </button>
       </div>
 
-      {/* CABECERA - se aplica gris si el álbum está inactivo */}
       <div className={`-mx-10 bg-gradient-to-b from-gray-800 to-indigo-300 rounded-xl p-12 transition-all ${!albumActive ? 'opacity-50 grayscale' : ''}`}>
         <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
           <img src={coverUrl} alt={album.title} className="w-70 h-65 object-cover rounded-lg shadow-lg" />
@@ -78,7 +102,6 @@ const AlbumDetail = ({ onPlay }) => {
         </div>
       </div>
 
-      {/* LISTA DE CANCIONES */}
       <div className="pt-4">
         {tracks.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm bg-slate-900/10 rounded-xl border border-slate-900">
@@ -92,53 +115,31 @@ const AlbumDetail = ({ onPlay }) => {
               <div className="hidden md:block">Album</div>
               <div className="w-24 flex justify-end pr-3"><Clock size={14} className="text-gray-300 mr-12" /></div>
             </div>
-
             <div className="mt-2 space-y-0.5">
               {tracks.map((track, index) => {
                 const playable = isTrackPlayable(track);
                 return (
-                  <div
-                    key={track.id}
-                    className={`grid grid-cols-[auto_1fr_1fr_auto] gap-4 items-center px-4 py-2.5 hover:bg-gray-900 rounded-lg transition-all group ${!playable ? 'opacity-50 pointer-events-none' : ''}`}
-                  >
+                  <div key={track.id} className={`grid grid-cols-[auto_1fr_1fr_auto] gap-4 items-center px-4 py-2.5 hover:bg-gray-900 rounded-lg transition-all group ${!playable ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="w-10 flex items-center justify-center relative">
-                      <span className="text-sm text-gray-400 group-hover:opacity-0 transition-opacity">
-                        {track.track_number || index + 1}
-                      </span>
+                      <span className="text-sm text-gray-400 group-hover:opacity-0 transition-opacity">{track.track_number || index + 1}</span>
                       {playable && (
-                        <button
-                          onClick={() => onPlay(track, tracks)}
-                          className="absolute inset-0 m-auto w-7 h-7 bg-sky-300 text-white rounded-full items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 flex active:scale-95"
-                        >
+                        <button onClick={() => onPlay(track, tracks)} className="absolute inset-0 m-auto w-7 h-7 bg-sky-300 text-white rounded-full items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 flex active:scale-95">
                           <Play size={12} fill="white" className="ml-0.5" />
                         </button>
                       )}
                     </div>
-
                     <div className="flex items-center gap-4 min-w-0">
                       <div className="flex flex-col truncate">
-                        <span className={`text-white text-lg transition-colors truncate ${!playable ? 'line-through text-gray-400' : ''}`}>
-                          {track.title}
-                        </span>
+                        <span className={`text-white text-lg transition-colors truncate ${!playable ? 'line-through text-gray-400' : ''}`}>{track.title}</span>
                         <span className="text-sm text-gray-400 truncate">{album.artist}</span>
                       </div>
                     </div>
-
                     <div className="hidden md:flex items-center text-sm text-gray-400 truncate pr-4">
                       <span className="truncate">{album.title}</span>
                     </div>
-
                     <div className="w-24 flex items-center justify-end gap-4">
-                      <span className="text-sm text-gray-400">
-                        {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, "0")}
-                      </span>
-                      <TrackActions
-                        track={track}
-                        isOpen={activeTrackMenuId === track.id}
-                        setIsOpen={(open) => setActiveTrackMenuId(open ? track.id : null)}
-                        isLastItem={index >= tracks.length - 2}
-                        disabled={!playable}
-                      />
+                      <span className="text-sm text-gray-400">{Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, "0")}</span>
+                      <TrackActions track={track} isOpen={activeTrackMenuId === track.id} setIsOpen={(open) => setActiveTrackMenuId(open ? track.id : null)} isLastItem={index >= tracks.length - 2} disabled={!playable} />
                     </div>
                   </div>
                 );

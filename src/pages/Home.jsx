@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import { Music, Loader2, Play } from "lucide-react";
@@ -17,56 +17,77 @@ const Home = ({ onPlay }) => {
   const getCoverUrl = (cover) => {
     if (!cover) return null;
     if (cover.startsWith("http")) return cover;
-    const baseUrl = api.defaults.baseURL.replace(/\/api$/, '');
+    const baseUrl = api.defaults.baseURL.replace(/\/api$/, "");
     return `${baseUrl}/storage/${cover}`;
   };
 
+  const fetchHomeData = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const [resTracks, resGenres, resAlbums] = await Promise.all([
+        api.get("/tracks"),
+        api.get("/genres"),
+        api.get("/albums"),
+      ]);
+
+      const tracksData = resTracks.data.data || resTracks.data || [];
+      const playableTracks = tracksData.filter((track) =>
+        isTrackPlayable(track)
+      );
+      const randomSongs = playableTracks
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 6);
+      setSongs(randomSongs);
+
+      const genresData = resGenres.data.data || resGenres.data || [];
+      setGenres(Array.isArray(genresData) ? genresData : []);
+
+      const albumsData = resAlbums.data.data || resAlbums.data || [];
+      if (Array.isArray(albumsData)) {
+        const artistMap = new Map();
+        albumsData.forEach((album) => {
+          const artistName = album.artist;
+          if (!artistName) return;
+          const isArtistActive = album.artist_active !== false;
+          const isGenreInactive = album.genre && album.genre.status === "n";
+          const isActive = isArtistActive && !isGenreInactive;
+          if (isActive && album.cover && !artistMap.has(artistName)) {
+            const coverUrl = getCoverUrl(album.cover);
+            artistMap.set(artistName, { name: artistName, cover: coverUrl });
+          }
+        });
+        const uniqueArtists = Array.from(artistMap.values())
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .slice(0, 6);
+        setArtists(uniqueArtists);
+      }
+    } catch (err) {
+      console.error("Error fetching home data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  // Carga inicial
   useEffect(() => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
-
     setLoading(true);
-    Promise.all([api.get("/tracks"), api.get("/genres"), api.get("/albums")])
-      .then(([resTracks, resGenres, resAlbums]) => {
-        // --- CANCIONES: solo las que son reproducibles ---
-        const tracksData = resTracks.data.data || resTracks.data || [];
-        const playableTracks = tracksData.filter(track => isTrackPlayable(track));
-        const randomSongs = playableTracks
-          .sort(() => 0.5 - Math.random())
-          .slice(0, 6);
-        setSongs(randomSongs);
+    fetchHomeData();
+  }, [isAuthenticated, fetchHomeData]);
 
-        // --- GÉNEROS ---
-        const genresData = resGenres.data.data || resGenres.data || [];
-        setGenres(Array.isArray(genresData) ? genresData : []);
-
-        // --- ARTISTAS (a partir de álbumes, como antes) ---
-        const albumsData = resAlbums.data.data || resAlbums.data || [];
-        if (Array.isArray(albumsData)) {
-          const artistMap = new Map();
-          albumsData.forEach((album) => {
-            const artistName = album.artist;
-            if (!artistName) return;
-            if (!artistMap.has(artistName) && album.cover) {
-              const coverUrl = getCoverUrl(album.cover);
-              const isArtistInactive = album.artist_active === false;
-              const isGenreInactive = album.genre && album.genre.status === 'n';
-              const isActive = !isArtistInactive && !isGenreInactive;
-              artistMap.set(artistName, { name: artistName, cover: coverUrl, active: isActive });
-            }
-          });
-          const uniqueArtists = Array.from(artistMap.values()).slice(0, 6);
-          setArtists(uniqueArtists);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error loading home data:", err);
-        setLoading(false);
-      });
-  }, [isAuthenticated]);
+  // Escuchar evento de canción invalidada para refrescar datos sin recargar página
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const handleRefresh = () => {
+      console.log("🔄 Evento track-invalidated recibido, refrescando Home...");
+      fetchHomeData();
+    };
+    window.addEventListener("track-invalidated", handleRefresh);
+    return () => window.removeEventListener("track-invalidated", handleRefresh);
+  }, [isAuthenticated, fetchHomeData]);
 
   if (loading)
     return (
@@ -83,7 +104,8 @@ const Home = ({ onPlay }) => {
         </div>
         <h1 className="text-4xl text-white">Welcome to MusiSense</h1>
         <p className="text-slate-400 max-w-md">
-          Discover, create and enjoy your personal music collection. Login to start your journey.
+          Discover, create and enjoy your personal music collection. Login to
+          start your journey.
         </p>
         <Link
           to="/login"
@@ -102,14 +124,16 @@ const Home = ({ onPlay }) => {
         <h2 className="text-xl text-white mb-6">Explore Genres</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {genres.map((genre) => {
-            const isInactive = genre.status === 'n';
+            const isInactive = genre.status === "n";
             return (
               <Link
                 key={genre.id}
                 to={isInactive ? "#" : `/genre/${genre.id}`}
                 onClick={(e) => isInactive && e.preventDefault()}
                 className={`h-12 bg-gradient-to-r from-gray-900 to-gray-700 rounded-full flex items-center justify-center cursor-pointer transition-all group px-4 text-center ${
-                  isInactive ? "opacity-50 grayscale pointer-events-none" : "hover:brightness-150"
+                  isInactive
+                    ? "opacity-50 grayscale pointer-events-none"
+                    : "hover:brightness-150"
                 }`}
               >
                 <span className="text-white text-sm">{genre.name}</span>
@@ -132,33 +156,27 @@ const Home = ({ onPlay }) => {
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8 justify-center justify-items-center max-w-5xl mx-auto">
-            {artists.map((artist) => {
-              const isInactive = !artist.active;
-              return (
-                <Link
-                  key={artist.name}
-                  to={isInactive ? "#" : `/artist/${encodeURIComponent(artist.name)}`}
-                  onClick={(e) => isInactive && e.preventDefault()}
-                  className={`flex flex-col items-center gap-4 group cursor-pointer w-full max-w-[160px] ${
-                    isInactive ? "opacity-50 grayscale pointer-events-none" : ""
-                  }`}
-                >
-                  <div className="w-32 h-32 md:w-36 md:h-36 rounded-full flex items-center justify-center transition-all duration-300 overflow-hidden group-hover:scale-110">
-                    <img
-                      src={artist.cover}
-                      alt={artist.name}
-                      className="w-full h-full object-cover transition-transform duration-500"
-                    />
-                  </div>
-                  <span className="text-sm text-white">{artist.name}</span>
-                </Link>
-              );
-            })}
+            {artists.map((artist) => (
+              <Link
+                key={artist.name}
+                to={`/artist/${encodeURIComponent(artist.name)}`}
+                className="flex flex-col items-center gap-4 group cursor-pointer w-full max-w-[160px]"
+              >
+                <div className="w-32 h-32 md:w-36 md:h-36 rounded-full flex items-center justify-center transition-all duration-300 overflow-hidden group-hover:scale-110">
+                  <img
+                    src={artist.cover}
+                    alt={artist.name}
+                    className="w-full h-full object-cover transition-transform duration-500"
+                  />
+                </div>
+                <span className="text-sm text-white">{artist.name}</span>
+              </Link>
+            ))}
           </div>
         </section>
       )}
 
-      {/* TRACKS - solo se muestran canciones reproducibles */}
+      {/* TRACKS */}
       {songs.length > 0 && (
         <section>
           <h2 className="text-xl text-white mb-6">Tracks you might like</h2>
@@ -201,7 +219,9 @@ const Home = ({ onPlay }) => {
                   <TrackActions
                     track={track}
                     isOpen={activeTrackMenuId === track.id}
-                    setIsOpen={(open) => setActiveTrackMenuId(open ? track.id : null)}
+                    setIsOpen={(open) =>
+                      setActiveTrackMenuId(open ? track.id : null)
+                    }
                     isLastItem={index >= songs.length - 2}
                   />
                 </div>

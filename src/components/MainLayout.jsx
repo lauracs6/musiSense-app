@@ -4,9 +4,7 @@ import api from "../api/axios";
 import ElectroBorder from "./Electroborder";
 import { isTrackPlayable } from "../utils/trackUtils";
 import {
-  Home as HomeIcon,
   Search,
-  PlusSquare,
   Play,
   Pause,
   SkipBack,
@@ -21,8 +19,6 @@ import {
   Shuffle,
   UserPlus,
   PlusIcon,
-  Music4,
-  Music2Icon,
 } from "lucide-react";
 
 const MainLayout = ({
@@ -32,6 +28,7 @@ const MainLayout = ({
   onPrev,
   isShuffle,
   setIsShuffle,
+  onTrackInvalid,
 }) => {
   const audioRef = useRef(null);
   const navigate = useNavigate();
@@ -56,23 +53,74 @@ const MainLayout = ({
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // Función auxiliar para obtener la URL completa de la carátula
   const getCoverUrl = (cover) => {
     if (!cover) return null;
     if (cover.startsWith("http")) return cover;
-    // La base del storage es la raíz del backend (sin /api)
-    const baseUrl = api.defaults.baseURL.replace(/\/api$/, '');
+    const baseUrl = api.defaults.baseURL.replace(/\/api$/, "");
     return `${baseUrl}/storage/${cover}`;
   };
 
+  // Detener audio si no hay token
   useEffect(() => {
-    if (!token) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+    if (!token && audioRef.current) {
+      audioRef.current.pause();
       setIsPlaying(false);
     }
   }, [token]);
+
+  // Verificar usuario activo cada 10s (interceptor maneja redirección)
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      api.get("/user").catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  // Verificar periódicamente si la canción actual sigue siendo reproducible
+  useEffect(() => {
+    if (!currentTrack || !token) return;
+
+    let isMounted = true;
+    const checkTrackStatus = async () => {
+      try {
+        const res = await api.get(`/tracks/${currentTrack.id}`);
+        const freshTrack = res.data.data || res.data;
+        if (!isTrackPlayable(freshTrack)) {
+          console.log("🔇 Canción ya no es reproducible, deteniendo...");
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          setIsPlaying(false);
+          if (isMounted && onTrackInvalid) onTrackInvalid();
+          // Disparar evento global para refrescar Home u otros componentes
+          window.dispatchEvent(new CustomEvent("track-invalidated"));
+        }
+      } catch (err) {
+        console.error("Error checking track status", err);
+      }
+    };
+
+    // Ejecutar inmediatamente al montar
+    checkTrackStatus();
+    const interval = setInterval(checkTrackStatus, 3000); // cada 3 segundos
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentTrack, token, onTrackInvalid]);
+
+  // Si al cargar la canción ya no es reproducible, saltar a la siguiente
+  useEffect(() => {
+    if (currentTrack && token && !isTrackPlayable(currentTrack)) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+      if (onNext) onNext();
+    }
+  }, [currentTrack, token, onNext]);
 
   const fetchPlaylists = () => {
     if (token) {
@@ -86,53 +134,47 @@ const MainLayout = ({
   useEffect(() => {
     fetchPlaylists();
     window.addEventListener("playlist-created", fetchPlaylists);
-    return () => {
-      window.removeEventListener("playlist-created", fetchPlaylists);
-    };
+    return () => window.removeEventListener("playlist-created", fetchPlaylists);
   }, [token, location.pathname]);
 
   useEffect(() => {
     if (currentTrack && audioRef.current && token) {
+      if (!isTrackPlayable(currentTrack)) {
+        if (onNext) onNext();
+        return;
+      }
       audioRef.current.load();
       audioRef.current
         .play()
         .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
+        .catch((e) => {
+          console.warn("Playback error", e);
+          setIsPlaying(false);
+        });
     }
-  }, [currentTrack, token]);
+  }, [currentTrack, token, onNext]);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume * 0.9;
-    }
+    if (audioRef.current) audioRef.current.volume = volume * 0.9;
   }, [volume]);
 
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
-      setColorIndex((prevIndex) => (prevIndex + 1) % rainbowColors.length);
+      setColorIndex((prev) => (prev + 1) % rainbowColors.length);
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPlaying, rainbowColors.length]);
+  }, [isPlaying]);
 
   const togglePlay = () => {
     if (!currentTrack) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
+    if (isPlaying) audioRef.current.pause();
+    else audioRef.current.play();
     setIsPlaying(!isPlaying);
   };
 
-  const handleTimeUpdate = () => {
-    setCurrentTime(audioRef.current.currentTime);
-  };
-
-  const handleLoadedMetadata = () => {
-    setDuration(audioRef.current.duration);
-  };
-
+  const handleTimeUpdate = () => setCurrentTime(audioRef.current.currentTime);
+  const handleLoadedMetadata = () => setDuration(audioRef.current.duration);
   const handleProgressChange = (e) => {
     const newTime = parseFloat(e.target.value);
     audioRef.current.currentTime = newTime;
@@ -160,16 +202,14 @@ const MainLayout = ({
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
   const volumePercent = volume * 100;
   const currentBorderColor = rainbowColors[colorIndex];
-
-  // Construir la URL del stream usando la baseURL de axios
-  const streamUrl = currentTrack && token
-    ? `${api.defaults.baseURL}/tracks/${currentTrack.id}/stream`
-    : null;
+  const streamUrl =
+    currentTrack && token
+      ? `${api.defaults.baseURL}/tracks/${currentTrack.id}/stream`
+      : null;
 
   return (
     <div className="flex h-screen w-screen flex-col bg-black text-gray-300 font-sans select-none overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
-        {/* SIDEBAR (igual que antes, sin cambios) */}
         <aside className="w-64 bg-gray-900 p-4 flex flex-col gap-4 border-r border-slate-900 overflow-y-auto overflow-x-hidden no-scrollbar">
           <div className="pt-2">
             <Link
@@ -183,7 +223,6 @@ const MainLayout = ({
               />
             </Link>
           </div>
-
           <nav className="flex flex-col gap-2 mt-2">
             <Link
               to="/search"
@@ -213,8 +252,7 @@ const MainLayout = ({
                         : "text-white bg-gray-500/20 hover:bg-gray-600/40"
                     }`}
                   >
-                    <PlusIcon size={18} />
-                    Create
+                    <PlusIcon size={18} /> Create
                   </Link>
                 </div>
                 <div className="space-y-2 max-h-[250px] overflow-y-auto no-scrollbar px-3 border-l border-indigo-950 ml-1">
@@ -251,7 +289,7 @@ const MainLayout = ({
               <div className="space-y-3">
                 <div
                   className={`flex items-center gap-4 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    location.pathname === `/profile`
+                    location.pathname === "/profile"
                       ? "text-sky-400 bg-gray-400/20"
                       : "text-indigo-400"
                   }`}
@@ -292,7 +330,6 @@ const MainLayout = ({
         </main>
       </div>
 
-      {/* AUDIO (solo si hay token y currentTrack) */}
       {token && currentTrack && (
         <audio
           ref={audioRef}
@@ -303,7 +340,6 @@ const MainLayout = ({
         />
       )}
 
-      {/* REPRODUCTOR */}
       {token ? (
         <ElectroBorder
           borderColor={currentBorderColor}
@@ -315,7 +351,6 @@ const MainLayout = ({
           className="w-full mt-auto transition-colors duration-1000 ease-in-out"
         >
           <footer className="h-24 bg-black/90 px-6 flex items-center justify-between backdrop-blur-md">
-            {/* Metadata */}
             <div className="flex items-center gap-4 w-1/4">
               <div className="animate-spin [animation-duration:20s] w-14 h-14 bg-slate-800 rounded-full border border-indigo-500/20 flex items-center justify-center overflow-hidden shrink-0">
                 {currentTrack?.album?.cover ? (
@@ -332,18 +367,19 @@ const MainLayout = ({
                 <div className="text-lg bg-gradient-to-r from-indigo-500 via-sky-400 to-purple-300 bg-[length:200%_auto] bg-clip-text text-transparent animate-gradient-x">
                   {currentTrack?.title || "No track selected"}
                 </div>
-                <div className="text-sm/lg ">
+                <div className="text-sm/lg">
                   {currentTrack?.artist || "MusiSense Player"}
                 </div>
               </div>
             </div>
 
-            {/* Controls */}
             <div className="flex flex-col items-center w-2/4 gap-2">
               <div className="flex items-center gap-6">
                 <button
                   onClick={() => setIsShuffle(!isShuffle)}
-                  className={`transition-all hover:scale-110 cursor-pointer ${isShuffle ? "text-indigo-400" : "text-gray-400 hover:text-white"}`}
+                  className={`transition-all hover:scale-110 cursor-pointer ${
+                    isShuffle ? "text-indigo-400" : "text-gray-400 hover:text-white"
+                  }`}
                   title="Shuffle"
                 >
                   <Shuffle size={22} />
@@ -374,9 +410,8 @@ const MainLayout = ({
                   <SkipForward size={22} fill="currentColor" />
                 </button>
               </div>
-
               <div className="w-full flex items-center gap-3 px-4">
-                <span className="text-xs  text-slate-400 w-12 text-right">
+                <span className="text-xs text-slate-400 w-12 text-right">
                   {formatTime(currentTime)}
                 </span>
                 <input
@@ -390,13 +425,12 @@ const MainLayout = ({
                   }}
                   className="flex-1 h-1 rounded-lg appearance-none cursor-pointer accent-white transition-all"
                 />
-                <span className="text-xs  text-slate-400 w-12">
+                <span className="text-xs text-slate-400 w-12">
                   {formatTime(duration)}
                 </span>
               </div>
             </div>
 
-            {/* Volume */}
             <div className="w-1/4 flex justify-end items-center gap-3">
               {volume === 0 ? (
                 <VolumeX

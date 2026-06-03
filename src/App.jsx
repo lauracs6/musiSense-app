@@ -24,20 +24,32 @@ function App() {
     setPlayedIndices([]);
   }, [queue, isShuffle]);
 
+  // Limpiar reproductor cuando se recibe evento de canción/playlist inválida
+  useEffect(() => {
+    const handleInvalid = () => {
+      setCurrentTrack(null);
+      setQueue([]);
+      setPlayedIndices([]);
+    };
+    window.addEventListener("track-invalidated", handleInvalid);
+    return () => window.removeEventListener("track-invalidated", handleInvalid);
+  }, []);
+
+  const handleInvalidTrack = () => {
+    setCurrentTrack(null);
+    setQueue([]);
+    setPlayedIndices([]);
+  };
+
   const handlePlay = (track, trackList = []) => {
-    // Si la canción no es reproducible, no hacer nada
     if (!isTrackPlayable(track)) return;
-
-    // Filtrar la lista completa para quedarnos solo con las reproducibles
     const playableTracks = trackList.filter(t => isTrackPlayable(t));
-
     setCurrentTrack(track);
     if (playableTracks.length > 0) {
       setQueue(playableTracks);
       const index = playableTracks.findIndex(t => t.id === track.id);
       setPlayedIndices([index]);
     } else {
-      // Si no hay ninguna canción reproducible, limpiamos la cola
       setQueue([]);
       setCurrentTrack(null);
       setPlayedIndices([]);
@@ -46,14 +58,11 @@ function App() {
 
   const handleNext = () => {
     if (queue.length === 0 || !currentTrack) return;
-
     const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-
     if (isShuffle) {
       const remainingIndices = queue
         .map((_, idx) => idx)
         .filter(idx => !playedIndices.includes(idx));
-
       if (remainingIndices.length > 0) {
         const randomIndex = remainingIndices[Math.floor(Math.random() * remainingIndices.length)];
         setCurrentTrack(queue[randomIndex]);
@@ -74,7 +83,6 @@ function App() {
   const handlePrev = () => {
     if (queue.length === 0 || !currentTrack) return;
     const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-
     if (currentIndex > 0) {
       setCurrentTrack(queue[currentIndex - 1]);
     }
@@ -87,6 +95,7 @@ function App() {
       onPrev={handlePrev}
       isShuffle={isShuffle}
       setIsShuffle={setIsShuffle}
+      onTrackInvalid={handleInvalidTrack}
     >
       <Routes>
         <Route path="/" element={<Home onPlay={handlePlay} />} />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -26,25 +26,55 @@ const PlaylistDetail = ({ onPlay }) => {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [loading, setLoading] = useState(true);
+  const intervalRef = useRef(null);
 
-  useEffect(() => {
-    fetchPlaylist();
-  }, [id]);
-
-  const fetchPlaylist = async () => {
-    setLoading(true);
+  const fetchPlaylist = useCallback(async () => {
     try {
       const res = await api.get(`/playlists/${id}`);
       const data = res.data.data;
       setPlaylist(data);
       setNewName(data.name);
       setNewDescription(data.description || "");
+      setLoading(false);
     } catch (err) {
       console.error("Error fetching playlist", err);
-    } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  // Carga inicial + polling cada 5 segundos
+  useEffect(() => {
+    fetchPlaylist();
+    intervalRef.current = setInterval(fetchPlaylist, 5000);
+    return () => clearInterval(intervalRef.current);
+  }, [fetchPlaylist]);
+
+  // Recargar al recibir foco de la ventana
+  useEffect(() => {
+    const handleFocus = () => fetchPlaylist();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [fetchPlaylist]);
+
+  // Escuchar evento de canción invalidada (por si viene de otro lugar)
+  useEffect(() => {
+    const handleRefresh = () => fetchPlaylist();
+    window.addEventListener("track-invalidated", handleRefresh);
+    return () => window.removeEventListener("track-invalidated", handleRefresh);
+  }, [fetchPlaylist]);
+
+  // 🔥 Detener reproducción inmediatamente si la playlist se desactiva
+  useEffect(() => {
+    if (!playlist) return;
+    if (playlist.status === "n") {
+      const audio = document.querySelector("audio");
+      if (audio && !audio.paused) {
+        audio.pause();
+      }
+      // Además, lanzar el evento para que MainLayout limpie la cola
+      window.dispatchEvent(new CustomEvent("track-invalidated"));
+    }
+  }, [playlist]);
 
   const handleUpdatePlaylist = async () => {
     try {
@@ -52,11 +82,7 @@ const PlaylistDetail = ({ onPlay }) => {
         name: newName,
         description: newDescription,
       });
-      setPlaylist((prev) => ({
-        ...prev,
-        name: newName,
-        description: newDescription,
-      }));
+      setPlaylist((prev) => ({ ...prev, name: newName, description: newDescription }));
       setIsEditing(false);
     } catch (err) {
       console.error("Error updating playlist", err);
@@ -93,10 +119,7 @@ const PlaylistDetail = ({ onPlay }) => {
     const items = Array.from(playlist.tracks);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
-    setPlaylist((prev) => ({
-      ...prev,
-      tracks: items,
-    }));
+    setPlaylist((prev) => ({ ...prev, tracks: items }));
     try {
       await api.post(`/playlists/${id}/reorder`, {
         track_ids: items.map((t) => t.id),
@@ -118,7 +141,8 @@ const PlaylistDetail = ({ onPlay }) => {
     return <div className="text-center text-slate-400 py-12">Playlist not found.</div>;
   }
 
-  const hasPlayableTracks = playlist.tracks?.some((track) => isTrackPlayable(track)) ?? false;
+  const isPlaylistActive = playlist.status === "y";
+  const hasPlayableTracks = isPlaylistActive && playlist.tracks?.some((track) => isTrackPlayable(track));
 
   const firstTrackCover = playlist.tracks?.find((t) => t.album?.cover)?.album?.cover;
   const coverUrl = firstTrackCover
@@ -141,7 +165,7 @@ const PlaylistDetail = ({ onPlay }) => {
       {/* CABECERA */}
       <div
         className={`-mx-10 bg-gradient-to-b from-gray-800 to-indigo-300 rounded-xl p-12 transition-all ${
-          !hasPlayableTracks && playlist.tracks?.length > 0 ? "opacity-50 grayscale" : ""
+          !isPlaylistActive ? "opacity-50 grayscale" : ""
         }`}
       >
         <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
@@ -156,7 +180,7 @@ const PlaylistDetail = ({ onPlay }) => {
           </div>
 
           <div className="flex flex-col text-center md:text-left space-y-2 w-full min-w-0">
-            {isEditing ? (
+            {isEditing && isPlaylistActive ? (
               <div className="mt-2 space-y-3">
                 <div className="flex items-center gap-3">
                   <input
@@ -194,27 +218,32 @@ const PlaylistDetail = ({ onPlay }) => {
                   <h1 className="w-max max-w-full text-4xl font-bold text-white tracking-widest truncate">
                     {playlist.name}
                   </h1>
-                  <div className="flex items-center gap-1 bg-slate-900/40 p-1 rounded-full border border-white/5 shadow-inner">
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="p-2 text-gray-400 hover:text-white transition-colors"
-                      title="Edit playlist"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={handleDeletePlaylist}
-                      className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                      title="Delete playlist"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                  {isPlaylistActive && (
+                    <div className="flex items-center gap-1 bg-slate-900/40 p-1 rounded-full border border-white/5 shadow-inner">
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="p-2 text-gray-400 hover:text-white transition-colors"
+                        title="Edit playlist"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={handleDeletePlaylist}
+                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                        title="Delete playlist"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <p className="text-white text-xl">{playlist.user || "User"}</p>
                 <p className="text-white text-lg">{playlist.description || "No description."}</p>
                 <p className="text-white text-sm">{playlist.tracks?.length || 0} tracks</p>
-                {!hasPlayableTracks && playlist.tracks?.length > 0 && (
+                {!isPlaylistActive && (
+                  <p className="text-red-300 text-sm font-bold">(Playlist inactive)</p>
+                )}
+                {isPlaylistActive && !hasPlayableTracks && playlist.tracks?.length > 0 && (
                   <p className="text-red-300 text-sm font-bold">(All tracks are currently unavailable)</p>
                 )}
               </div>
@@ -236,15 +265,17 @@ const PlaylistDetail = ({ onPlay }) => {
                 Start discovering music and curate your perfect selection.
               </p>
             </div>
-            <Link
-              to="/search"
-              className="mt-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-sky-400 hover:brightness-125 text-white text-sm font-medium rounded-full transition-all shadow-lg flex items-center gap-2 active:scale-95"
-            >
-              <Plus size={16} /> Find songs to add
-            </Link>
+            {isPlaylistActive && (
+              <Link
+                to="/search"
+                className="mt-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-sky-400 hover:brightness-125 text-white text-sm font-medium rounded-full transition-all shadow-lg flex items-center gap-2 active:scale-95"
+              >
+                <Plus size={16} /> Find songs to add
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="w-full flex flex-col">
+          <div className={`w-full flex flex-col ${!isPlaylistActive ? "opacity-50 grayscale pointer-events-none" : ""}`}>
             <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-2 border-b border-gray-800 text-[11px] tracking-widest text-gray-300">
               <div className="w-10 text-center">#</div>
               <div>Song</div>
@@ -259,7 +290,7 @@ const PlaylistDetail = ({ onPlay }) => {
                 {(provided) => (
                   <div {...provided.droppableProps} ref={provided.innerRef} className="mt-2 space-y-0.5">
                     {playlist.tracks.map((track, index) => {
-                      const playable = isTrackPlayable(track);
+                      const playable = isPlaylistActive && isTrackPlayable(track);
                       return (
                         <Draggable
                           key={track.id.toString()}
