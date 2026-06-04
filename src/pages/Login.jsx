@@ -7,15 +7,14 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  // Leer mensaje de localStorage sincrónicamente al iniciar el estado
+
   const [error, setError] = useState(() => {
-    const savedMessage = localStorage.getItem('deactivatedMessage');
+    const savedMessage = localStorage.getItem("deactivatedMessage");
     if (savedMessage) {
-      localStorage.removeItem('deactivatedMessage');
+      localStorage.removeItem("deactivatedMessage");
       return savedMessage;
     }
-    return '';
+    return "";
   });
 
   const navigate = useNavigate();
@@ -31,7 +30,8 @@ const Login = () => {
       localStorage.setItem("user", JSON.stringify(response.data.user));
       navigate("/");
     } catch (err) {
-      const message = err.response?.data?.message || "Invalid credentials. Please try again.";
+      const message =
+        err.response?.data?.message || "Invalid credentials. Please try again.";
       setError(message);
     } finally {
       setLoading(false);
@@ -91,13 +91,20 @@ const Login = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-indigo-500 to-sky-400 hover:brightness-150 text-white text-sm py-3 rounded-full transition-all shadow-lg active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none mt-2"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : "Sign In"}
+            {loading ? (
+              <Loader2 className="animate-spin" size={18} />
+            ) : (
+              "Sign In"
+            )}
           </button>
         </form>
 
         <p className="text-sm text-center text-gray-300 pt-2">
           Don't have an account?{" "}
-          <Link to="/register" className="text-indigo-400 hover:text-sky-300 transition-all">
+          <Link
+            to="/register"
+            className="text-indigo-400 hover:text-sky-300 transition-all"
+          >
             Sign Up
           </Link>
         </p>

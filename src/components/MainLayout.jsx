@@ -68,7 +68,7 @@ const MainLayout = ({
     }
   }, [token]);
 
-  // Verificar usuario activo cada 10s (interceptor maneja redirección)
+  // Verificar usuario activo cada 10s (redirección)
   useEffect(() => {
     if (!token) return;
     const interval = setInterval(() => {
@@ -378,7 +378,9 @@ const MainLayout = ({
                 <button
                   onClick={() => setIsShuffle(!isShuffle)}
                   className={`transition-all hover:scale-110 cursor-pointer ${
-                    isShuffle ? "text-indigo-400" : "text-gray-400 hover:text-white"
+                    isShuffle
+                      ? "text-indigo-400"
+                      : "text-gray-400 hover:text-white"
                   }`}
                   title="Shuffle"
                 >

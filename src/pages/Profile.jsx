@@ -6,7 +6,6 @@ const Profile = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
 
-  // Estados para contraseñas
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -15,7 +14,6 @@ const Profile = () => {
   const [fetching, setFetching] = useState(true);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  // 1. Obtener la información del usuario desde localStorage
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem("user");
@@ -36,12 +34,10 @@ const Profile = () => {
     }
   }, []);
 
-  // 2. Ejecutar las actualizaciones del formulario
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setMessage({ type: "", text: "" });
 
-    // Si intenta cambiar la contraseña, validamos en cliente que ponga la actual y coincidan las nuevas
     if (newPassword) {
       if (!currentPassword) {
         setMessage({
@@ -59,12 +55,10 @@ const Profile = () => {
     setLoading(true);
     const promises = [];
 
-    // Si el username cambió, disparamos a la ruta pública '/user'
     if (username.trim() !== "") {
       promises.push(api.put("/user", { username }));
     }
 
-    // Si se rellenó la nueva contraseña, enviamos también 'current_password' requerida por Laravel
     if (newPassword) {
       promises.push(
         api.put("/user/password", {
@@ -78,7 +72,6 @@ const Profile = () => {
     try {
       await Promise.all(promises);
 
-      // Actualizamos el localStorage para mantener sincronizado el Front
       const savedUser = localStorage.getItem("user");
       if (savedUser) {
         const userData = JSON.parse(savedUser);
@@ -92,7 +85,6 @@ const Profile = () => {
       setConfirmPassword("");
     } catch (err) {
       console.error(err);
-      // Mapeamos los errores de validación de Laravel si vienen en un array/objeto
       const responseData = err.response?.data;
       let errorMsg =
         responseData?.message || "Error updating account settings.";
@@ -117,7 +109,7 @@ const Profile = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500 bg-gray-900 border border-sky-300 rounded-3xl p-6 shadow-2xl">
-      {/* CABECERA */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row gap-6 items-center p-2 border-b border-slate-800/60 pb-6">
         <div className="flex flex-col text-center space-y-1 w-full pb-1">
           <p className="text-lg text-white">Profile settings</p>
@@ -128,7 +120,7 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* ALERTAS */}
+      {/* ALERTS */}
       {message.text && (
         <div
           className={`flex items-center gap-3 p-4 rounded-xl text-sm font-semibold border ${
@@ -146,12 +138,12 @@ const Profile = () => {
         </div>
       )}
 
-      {/* FORMULARIO */}
+      {/* FORM */}
       <form
         onSubmit={handleUpdateProfile}
         className="space-y-6 bg-slate-900/10 p-6 rounded-2xl border border-slate-900 shadow-xl"
       >
-        {/* SECCIÓN 1: USERNAME */}
+        {/* SECTION 1: USERNAME */}
         <div className="space-y-4">
           <div className="flex flex-col space-y-2">
             <label className="text-lg text-white tracking-wider">
@@ -168,7 +160,7 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* SECCIÓN 2: CONTRASEÑA */}
+        {/* SECTION 2: PASSWORD */}
         <div className="space-y-4 pt-4">
           <h2 className="text-lg text-white tracking-wider">Password</h2>
           <p className="text-sm text-gray-300">
@@ -176,8 +168,7 @@ const Profile = () => {
             password.
           </p>
 
-          <div className="grid grid-cols-1 gap-4">
-            {/* Campo Password Actual - Ocupa ancho completo arriba */}
+          <div className="grid grid-cols-1 gap-4">            
             <div className="flex flex-col space-y-2">
               <label className="text-sm text-white tracking-wider">
                 Current Password
@@ -196,8 +187,7 @@ const Profile = () => {
                 />
               </div>
             </div>
-
-            {/* Sub-grilla para las dos nuevas contraseñas */}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col space-y-2">
                 <label className="text-sm text-white tracking-wider">
@@ -239,8 +229,7 @@ const Profile = () => {
             </div>
           </div>
         </div>
-
-        {/* BOTÓN SUBMIT */}
+        
         <div className="pt-4 flex justify-center">
           <button
             type="submit"

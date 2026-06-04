@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { MoreVertical, Plus, ListMusic, CheckCircle2, Loader2, FolderPlus } from 'lucide-react';
 
-// Recibimos las props de control del padre
 const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
   const [playlists, setPlaylists] = useState([]);
   const [addedStatus, setAddedStatus] = useState(null); 
@@ -23,7 +22,7 @@ const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
       setAddedStatus(playlistId);
       setTimeout(() => {
         setAddedStatus(null);
-        setIsOpen(false); // Cierra el menú automáticamente
+        setIsOpen(false); 
       }, 1500);
     } catch (err) {
       console.error("Error adding track to playlist", err);
@@ -54,7 +53,7 @@ const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
 
         setTimeout(() => {
           setAddedStatus(null);
-          setIsOpen(false); // Cierra el menú automáticamente
+          setIsOpen(false); 
         }, 1500);
       }
     } catch (err) {
@@ -68,7 +67,7 @@ const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
     <div className="relative">
       <button 
         onClick={(e) => {
-          e.stopPropagation(); // Evita interferencias de clics
+          e.stopPropagation(); 
           setIsOpen(!isOpen);
         }}
         className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-700/50 transition-colors"
@@ -76,8 +75,7 @@ const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
         <MoreVertical size={20} />
       </button>
 
-      {isOpen && (
-        /* 🔥 CLASE DINÁMICA: Si es el último item, usa bottom-full (despliega arriba); si no, mt-2 (despliega abajo) */
+      {isOpen && (        
         <div className={`absolute right-0 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[100] animate-in zoom-in-95 duration-100 flex flex-col max-h-80 ${
           isLastItem ? 'bottom-full mb-2' : 'top-full mt-2'
         }`}>
@@ -87,7 +85,7 @@ const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
             <p className="text-[10px]  text-slate-400 uppercase tracking-widest px-2">Add to Playlist</p>
           </div>
           
-          {/* Listado */}
+          {/* Playlists available */}
           <div className="flex-1 overflow-y-auto p-1 no-scrollbar max-h-44 border-b border-slate-800/60">
             {playlists.length > 0 ? (
               playlists.map(pl => (
@@ -113,7 +111,7 @@ const TrackActions = ({ track, isOpen, setIsOpen, isLastItem }) => {
             )}
           </div>
 
-          {/* Formulario */}
+          {/* Form */}
           <div className="p-2.5 bg-slate-950/40 rounded-b-xl">
             <form onSubmit={handleFastCreateAndAdd} className="space-y-1.5">
               <input

@@ -18,17 +18,14 @@ const GenreDetail = () => {
         const genreData = res.data.data || res.data;
         setGenre(genreData);
 
-        // Los álbumes ya vienen filtrados por Laravel gracias a .load('albums.artists')
         const genreAlbums = genreData.albums || [];
 
-        // Agrupar álbumes por artista leyendo el array plural 'artists'
         const artistMap = {};
         genreAlbums.forEach((album) => {
-          // Tomamos el nombre del primer artista del array si existe
           const artistName =
             album.artists && album.artists.length > 0
               ? album.artists[0].name || album.artists[0].nombre
-              : "Artista Desconocido";
+              : "Artist Unknown";
 
           if (!artistMap[artistName]) {
             artistMap[artistName] = [];
@@ -36,11 +33,9 @@ const GenreDetail = () => {
           artistMap[artistName].push(album);
         });
 
-        // Ordenar artistas Alfabéticamente de la A a la Z (Vertical)
         const sortedArtists = Object.keys(artistMap)
           .sort((a, b) => a.localeCompare(b))
           .map((artistName) => {
-            // Ordenar los álbumes de este artista por año: Más reciente primero (Horizontal)
             const sortedAlbums = artistMap[artistName].sort((a, b) => {
               const yearA = parseInt(a.year || a.release_year || 0);
               const yearB = parseInt(b.year || b.release_year || 0);
@@ -82,7 +77,7 @@ const GenreDetail = () => {
       >
         <ArrowLeft size={20} />
       </Link>
-      {/* Cabecera de la vista */}
+      {/* Header */}
       <div className="-mx-10 bg-gradient-to-b from-gray-800 to-indigo-300 rounded-xl p-12">
         <div className="flex items-center gap-4">
           <div>
@@ -103,12 +98,12 @@ const GenreDetail = () => {
         </div>
       ) : (
         <div className="space-y-10">
-          {/* Artistas de la A a la Z (vertical) */}
+          {/* Artists from A to Z (vertical) */}
           {groupedArtists.map((artist) => (
             <div key={artist.name} className="space-y-4">
               <h2 className="text-white text-lg">{artist.name}</h2>
 
-              {/* Álbumes de más reciente a más antiguo (horizontal) */}
+              {/* Albums from newest to oldest */}
               <div className="flex gap-5 overflow-x-auto pb-4 pt-1 px-1">
                 {artist.albums.map((album) => {
                   const coverUrl = album.cover
@@ -144,7 +139,7 @@ const GenreDetail = () => {
                         <p className="text-sm text-gray-300 truncate">
                           {album.artists && album.artists.length > 0
                             ? album.artists[0].name || album.artists[0].nombre
-                            : "Artista"}
+                            : "Unknown Artist"}
                         </p>
                         <p className="text-sm text-gray-300 ">
                           {album.year || album.release_year || "N/A"}

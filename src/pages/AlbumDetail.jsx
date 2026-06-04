@@ -54,7 +54,7 @@ const AlbumDetail = ({ onPlay }) => {
     fetchAlbum();
   }, [fetchAlbum]);
 
-  // Polling cada 10 segundos (solo visible)
+  // Polling cada 10 segundos
   useEffect(() => {
     const startPolling = () => {
       if (pollingRef.current) return;

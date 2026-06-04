@@ -32,7 +32,7 @@ const Home = ({ onPlay }) => {
 
       const tracksData = resTracks.data.data || resTracks.data || [];
       const playableTracks = tracksData.filter((track) =>
-        isTrackPlayable(track)
+        isTrackPlayable(track),
       );
       const randomSongs = playableTracks
         .sort(() => 0.5 - Math.random())
@@ -68,7 +68,6 @@ const Home = ({ onPlay }) => {
     }
   }, [isAuthenticated]);
 
-  // Carga inicial
   useEffect(() => {
     if (!isAuthenticated) {
       setLoading(false);
@@ -78,7 +77,7 @@ const Home = ({ onPlay }) => {
     fetchHomeData();
   }, [isAuthenticated, fetchHomeData]);
 
-  // Escuchar evento de canción invalidada para refrescar datos sin recargar página
+  // Escuchar evento de canción desactivada para refrescar la página
   useEffect(() => {
     if (!isAuthenticated) return;
     const handleRefresh = () => {

@@ -26,7 +26,6 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // Petición limpia enviando las llaves exactas que el nuevo backend espera
       const response = await api.post("/register", {
         username: username.trim(),
         email: email.trim(),
@@ -48,7 +47,6 @@ const Register = () => {
     } catch (err) {
       console.error("API Error Response:", err.response);
 
-      // Control de errores de validación de Laravel
       if (err.response?.data?.errors) {
         const validationErrors = err.response.data.errors;
         const firstKey = Object.keys(validationErrors)[0];

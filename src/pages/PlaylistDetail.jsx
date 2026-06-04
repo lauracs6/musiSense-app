@@ -42,7 +42,6 @@ const PlaylistDetail = ({ onPlay }) => {
     }
   }, [id]);
 
-  // Carga inicial + polling cada 5 segundos
   useEffect(() => {
     fetchPlaylist();
     intervalRef.current = setInterval(fetchPlaylist, 5000);
@@ -56,22 +55,21 @@ const PlaylistDetail = ({ onPlay }) => {
     return () => window.removeEventListener("focus", handleFocus);
   }, [fetchPlaylist]);
 
-  // Escuchar evento de canción invalidada (por si viene de otro lugar)
+  // Escuchar evento de canción desactivada
   useEffect(() => {
     const handleRefresh = () => fetchPlaylist();
     window.addEventListener("track-invalidated", handleRefresh);
     return () => window.removeEventListener("track-invalidated", handleRefresh);
   }, [fetchPlaylist]);
 
-  // 🔥 Detener reproducción inmediatamente si la playlist se desactiva
+  // Detener reproducción inmediatamente si la playlist se desactiva
   useEffect(() => {
     if (!playlist) return;
     if (playlist.status === "n") {
       const audio = document.querySelector("audio");
       if (audio && !audio.paused) {
         audio.pause();
-      }
-      // Además, lanzar el evento para que MainLayout limpie la cola
+      }      
       window.dispatchEvent(new CustomEvent("track-invalidated"));
     }
   }, [playlist]);
@@ -82,7 +80,11 @@ const PlaylistDetail = ({ onPlay }) => {
         name: newName,
         description: newDescription,
       });
-      setPlaylist((prev) => ({ ...prev, name: newName, description: newDescription }));
+      setPlaylist((prev) => ({
+        ...prev,
+        name: newName,
+        description: newDescription,
+      }));
       setIsEditing(false);
     } catch (err) {
       console.error("Error updating playlist", err);
@@ -90,7 +92,11 @@ const PlaylistDetail = ({ onPlay }) => {
   };
 
   const handleDeletePlaylist = async () => {
-    if (!window.confirm("Are you sure you want to permanently delete this playlist?"))
+    if (
+      !window.confirm(
+        "Are you sure you want to permanently delete this playlist?",
+      )
+    )
       return;
     try {
       await api.delete(`/playlists/${id}`);
@@ -138,13 +144,20 @@ const PlaylistDetail = ({ onPlay }) => {
   }
 
   if (!playlist) {
-    return <div className="text-center text-slate-400 py-12">Playlist not found.</div>;
+    return (
+      <div className="text-center text-slate-400 py-12">
+        Playlist not found.
+      </div>
+    );
   }
 
   const isPlaylistActive = playlist.status === "y";
-  const hasPlayableTracks = isPlaylistActive && playlist.tracks?.some((track) => isTrackPlayable(track));
+  const hasPlayableTracks =
+    isPlaylistActive &&
+    playlist.tracks?.some((track) => isTrackPlayable(track));
 
-  const firstTrackCover = playlist.tracks?.find((t) => t.album?.cover)?.album?.cover;
+  const firstTrackCover = playlist.tracks?.find((t) => t.album?.cover)?.album
+    ?.cover;
   const coverUrl = firstTrackCover
     ? firstTrackCover.startsWith("http")
       ? firstTrackCover
@@ -162,7 +175,7 @@ const PlaylistDetail = ({ onPlay }) => {
         </button>
       </div>
 
-      {/* CABECERA */}
+      {/* HEADER */}
       <div
         className={`-mx-10 bg-gradient-to-b from-gray-800 to-indigo-300 rounded-xl p-12 transition-all ${
           !isPlaylistActive ? "opacity-50 grayscale" : ""
@@ -171,7 +184,11 @@ const PlaylistDetail = ({ onPlay }) => {
         <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
           <div className="w-44 h-44 md:w-48 md:h-48 bg-slate-800 rounded-lg overflow-hidden shrink-0 shadow-2xl border border-slate-800/40">
             {coverUrl ? (
-              <img src={coverUrl} alt={playlist.name} className="w-full h-full object-cover" />
+              <img
+                src={coverUrl}
+                alt={playlist.name}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-slate-600">
                 <Music size={64} />
@@ -238,14 +255,24 @@ const PlaylistDetail = ({ onPlay }) => {
                   )}
                 </div>
                 <p className="text-white text-xl">{playlist.user || "User"}</p>
-                <p className="text-white text-lg">{playlist.description || "No description."}</p>
-                <p className="text-white text-sm">{playlist.tracks?.length || 0} tracks</p>
+                <p className="text-white text-lg">
+                  {playlist.description || "No description."}
+                </p>
+                <p className="text-white text-sm">
+                  {playlist.tracks?.length || 0} tracks
+                </p>
                 {!isPlaylistActive && (
-                  <p className="text-red-300 text-sm font-bold">(Playlist inactive)</p>
+                  <p className="text-red-300 text-sm font-bold">
+                    (Playlist inactive)
+                  </p>
                 )}
-                {isPlaylistActive && !hasPlayableTracks && playlist.tracks?.length > 0 && (
-                  <p className="text-red-300 text-sm font-bold">(All tracks are currently unavailable)</p>
-                )}
+                {isPlaylistActive &&
+                  !hasPlayableTracks &&
+                  playlist.tracks?.length > 0 && (
+                    <p className="text-red-300 text-sm font-bold">
+                      (All tracks are currently unavailable)
+                    </p>
+                  )}
               </div>
             )}
           </div>
@@ -260,7 +287,9 @@ const PlaylistDetail = ({ onPlay }) => {
               <Music size={28} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-white font-medium text-lg">This playlist is completely empty</h3>
+              <h3 className="text-white font-medium text-lg">
+                This playlist is completely empty
+              </h3>
               <p className="text-slate-400 text-sm max-w-xs mx-auto">
                 Start discovering music and curate your perfect selection.
               </p>
@@ -275,7 +304,9 @@ const PlaylistDetail = ({ onPlay }) => {
             )}
           </div>
         ) : (
-          <div className={`w-full flex flex-col ${!isPlaylistActive ? "opacity-50 grayscale pointer-events-none" : ""}`}>
+          <div
+            className={`w-full flex flex-col ${!isPlaylistActive ? "opacity-50 grayscale pointer-events-none" : ""}`}
+          >
             <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-2 border-b border-gray-800 text-[11px] tracking-widest text-gray-300">
               <div className="w-10 text-center">#</div>
               <div>Song</div>
@@ -288,9 +319,14 @@ const PlaylistDetail = ({ onPlay }) => {
             <DragDropContext onDragEnd={onDragEnd}>
               <Droppable droppableId="playlist-tracks">
                 {(provided) => (
-                  <div {...provided.droppableProps} ref={provided.innerRef} className="mt-2 space-y-0.5">
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="mt-2 space-y-0.5"
+                  >
                     {playlist.tracks.map((track, index) => {
-                      const playable = isPlaylistActive && isTrackPlayable(track);
+                      const playable =
+                        isPlaylistActive && isTrackPlayable(track);
                       return (
                         <Draggable
                           key={track.id.toString()}
@@ -303,7 +339,9 @@ const PlaylistDetail = ({ onPlay }) => {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               className={`grid grid-cols-[auto_1fr_1fr_auto] gap-4 items-center px-4 py-2.5 rounded-lg transition-all group ${
-                                !playable ? "opacity-50 grayscale pointer-events-none" : ""
+                                !playable
+                                  ? "opacity-50 grayscale pointer-events-none"
+                                  : ""
                               } ${
                                 snapshot.isDragging && playable
                                   ? "bg-indigo-900/40 border border-indigo-500/30"
@@ -316,10 +354,16 @@ const PlaylistDetail = ({ onPlay }) => {
                                 </span>
                                 {playable && (
                                   <button
-                                    onClick={() => onPlay(track, playlist.tracks)}
+                                    onClick={() =>
+                                      onPlay(track, playlist.tracks)
+                                    }
                                     className="absolute inset-0 m-auto w-7 h-7 bg-sky-300 text-white rounded-full items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100 flex active:scale-95"
                                   >
-                                    <Play size={12} fill="white" className="ml-0.5" />
+                                    <Play
+                                      size={12}
+                                      fill="white"
+                                      className="ml-0.5"
+                                    />
                                   </button>
                                 )}
                               </div>
@@ -337,7 +381,9 @@ const PlaylistDetail = ({ onPlay }) => {
                                 <div className="flex flex-col truncate">
                                   <span
                                     className={`text-white text-lg transition-colors truncate ${
-                                      !playable ? "line-through text-gray-400" : ""
+                                      !playable
+                                        ? "line-through text-gray-400"
+                                        : ""
                                     }`}
                                   >
                                     {track.title}
@@ -350,7 +396,9 @@ const PlaylistDetail = ({ onPlay }) => {
 
                               <div className="hidden md:flex items-center text-sm text-gray-400 truncate pr-4">
                                 <span className="truncate">
-                                  {track.album?.title || track.album?.name || "Single"}
+                                  {track.album?.title ||
+                                    track.album?.name ||
+                                    "Single"}
                                 </span>
                               </div>
 

@@ -41,7 +41,7 @@ const ArtistDetail = () => {
 
       setAlbums(sortedAlbums);
 
-      // 🔥 Determinar si el artista está activo: si tiene al menos un álbum activo
+      // Determinar si el artista está activo: si tiene al menos un álbum activo
       const hasActiveAlbums = sortedAlbums.some(album => album.status === 'y');
       setArtistActive(hasActiveAlbums);
     } catch (err) {
@@ -51,23 +51,21 @@ const ArtistDetail = () => {
     }
   }, [artistName]);
 
-  // Carga inicial
   useEffect(() => {
     setLoading(true);
     fetchArtistData();
   }, [fetchArtistData]);
 
-  // Escuchar evento global para refrescar (cuando se invalida una canción)
+  // Escuchar evento global para refrescar (cuando se desactiva una canción)
   useEffect(() => {
-    const handleRefresh = () => {
-      console.log("🔄 Evento track-invalidated recibido, refrescando artista...");
+    const handleRefresh = () => {      
       fetchArtistData();
     };
     window.addEventListener("track-invalidated", handleRefresh);
     return () => window.removeEventListener("track-invalidated", handleRefresh);
   }, [fetchArtistData]);
 
-  // Polling cada 10 segundos (solo cuando la pestaña está visible)
+  // Polling cada 10 segundos
   useEffect(() => {
     const startPolling = () => {
       if (pollingIntervalRef.current) return;
@@ -126,7 +124,7 @@ const ArtistDetail = () => {
         </button>
       </div>
 
-      {/* CABECERA - se pone gris si no tiene álbumes activos */}
+      {/* CABECERA */}
       <div className={`-mx-10 bg-gradient-to-b from-gray-800 to-indigo-300 rounded-xl p-12 transition-all ${!artistActive ? "opacity-50 grayscale" : ""}`}>
         <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
           <img src={artistProfilePic} alt={artistName} className="w-70 h-65 object-cover rounded-full shadow-lg" />

@@ -11,7 +11,7 @@ const ArtistsList = () => {
   const getCoverUrl = (cover) => {
     if (!cover) return null;
     if (cover.startsWith("http")) return cover;
-    const baseUrl = api.defaults.baseURL.replace(/\/api$/, '');
+    const baseUrl = api.defaults.baseURL.replace(/\/api$/, "");
     return `${baseUrl}/storage/${cover}`;
   };
 
@@ -45,8 +45,9 @@ const ArtistsList = () => {
           }
         });
 
-        const uniqueArtists = Array.from(artistMap.values())
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const uniqueArtists = Array.from(artistMap.values()).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
         setArtists(uniqueArtists);
       }
       setLoading(false);
@@ -70,7 +71,7 @@ const ArtistsList = () => {
     return () => window.removeEventListener("focus", handleFocus);
   }, [fetchArtists]);
 
-  // Escuchar evento de canción inválida (para refrescar)
+  // Escuchar evento de canción desactivada
   useEffect(() => {
     const handleRefresh = () => fetchArtists();
     window.addEventListener("track-invalidated", handleRefresh);
@@ -106,7 +107,9 @@ const ArtistsList = () => {
 
       <div className="space-y-4">
         {artists.length === 0 ? (
-          <div className="text-center text-slate-500 py-12">No artists found.</div>
+          <div className="text-center text-slate-500 py-12">
+            No artists found.
+          </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-8 justify-items-center mx-auto">
             {artists.map((artist) => {
@@ -114,7 +117,11 @@ const ArtistsList = () => {
               return (
                 <Link
                   key={artist.name}
-                  to={isActive ? `/artist/${encodeURIComponent(artist.name)}` : "#"}
+                  to={
+                    isActive
+                      ? `/artist/${encodeURIComponent(artist.name)}`
+                      : "#"
+                  }
                   onClick={(e) => !isActive && e.preventDefault()}
                   className={`flex flex-col items-center gap-4 group cursor-pointer w-full max-w-[160px] ${
                     !isActive ? "opacity-50 grayscale pointer-events-none" : ""
